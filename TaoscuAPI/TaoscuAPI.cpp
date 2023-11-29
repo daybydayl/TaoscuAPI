@@ -15,6 +15,7 @@ RDB_NET rdb_net;
 //测试已完成api
 void testmaster(CTaosSyn*& pTaosSyn_obj);
 void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj);
+void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj);
 void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
 
 void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj);
@@ -43,9 +44,8 @@ int main(int argc, char* argv[])
 	pTaosSyn_obj->m_pass = "taosdata";
 	pTaosSyn_obj->m_db = "";
 	pTaosSyn_obj->m_port = 6030;
-	TAOS* pTaos = NULL;
 
-	ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj, pTaos);
+	ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj);
 	if (0 != ret)
 		return -1;
 
@@ -59,19 +59,21 @@ int main(int argc, char* argv[])
 void testmaster(CTaosSyn*& pTaosSyn_obj)
 {
 	//testExecuteOneQueryDirectofRecordBytes(pTaosSyn_obj);
+	//testExecuteSqlCtlDB(pTaosSyn_obj);
 	//testExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
-	//testExecuteInsertNRecordbyFile(pTaosSyn_obj);
-	//testExecuteInsertNRecordbyBuf(pTaosSyn_obj);
+	//testExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
+	testExecuteInsertNRecordbyBuf(pTaosSyn_obj);
 }
 
 void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
 {
+	int Ret = -1;
 	char* szResult = NULL;
 	int Record_num;
 	int Onerecordlen;
 	TAOS_FIELD* fields_info;
 	int fields_num = 0;
-	pTaosSyn_obj->ExecuteOneQueryDirectofRecordBytes("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", szResult, Record_num, Onerecordlen, fields_info, fields_num);
+	Ret = pTaosSyn_obj->ExecuteOneQueryDirectofRecordBytes("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", szResult, Record_num, Onerecordlen, fields_info, fields_num);
 
 	//解析测试存放字节流是否正确
 	int Offset = 0;
@@ -95,14 +97,36 @@ void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
 	free(szResult);
 }
 
+void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj)
+{
+	TAOS_RES* res;
+	int Ret = -1;
+	Ret = pTaosSyn_obj->ExecuteSqlCtlDB("create database IF NOT EXISTS lzj");
+	Ret = pTaosSyn_obj->ExecuteSqlCtlDB("use lzj");
+	Ret = pTaosSyn_obj->ExecuteSqlCtlDB("create stable IF NOT EXISTS meas_meter(ts timestamp, meas_value double) tags(meas_name nchar(60), meas_type int)");
+	Ret = pTaosSyn_obj->ExecuteSqlCtlDB("show stables",res);
+
+
+	//查看res获取的是否正常
+	TAOS_ROW    row;
+	int         num_fields = taos_field_count(res);
+	TAOS_FIELD* fields = taos_fetch_fields(res);
+	string str = "";
+	while ((row = taos_fetch_row(res))) {
+		str.clear();
+		taos_print_row((char*)str.c_str(), row, fields, num_fields);
+	}
+
+}
+
 void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj)
 {
-
+	int Ret = -1;
 	char** Result = NULL;
 	int Record_num;
 	TAOS_FIELD* fields_info;
 	int fields_num = 0;
-	pTaosSyn_obj->ExecuteOneQueryDirectofRecordList("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", Result, Record_num, fields_info, fields_num);
+	Ret = pTaosSyn_obj->ExecuteOneQueryDirectofRecordList("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", Result, Record_num, fields_info, fields_num);
 
 
 	//解析测试存放字节流是否正确
@@ -122,14 +146,13 @@ void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj)
 		memcpy(name, Result[i] + Offset, fields_info[2].bytes);
 		Offset += fields_info[2].bytes;
 		memcpy((char*)&type, Result[i] + Offset, fields_info[3].bytes);
-		//sscanf(szResult + Onerecordlen * i + value_Offset, "%f", &value);
 	}
 	pTaosSyn_obj->FreePtP(Result, Record_num);
 }
 
 void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj)
 {
-	
+	//接口待完成
 	string ntbname = "rr6000.meas_meter2";
 	string nfileloc = "D:/My_program/TaoscuAPI/TaoscuAPI/testdata.txt";
 	int nTAGNum = 2;
@@ -215,7 +238,7 @@ void testExecuteInsertNRecordbyBuf(CTaosSyn*& pTaosSyn_obj)
 	tags_name[2] = chTAGName2;
 
 	//这里默认子表不存在，在rr6000库下所属meas_test超级表创建么meastest1子表，按全部tag域数据插入，meas_test超级表结构：ts,meas_value,meas_id(tag),fac_id(tag),meas_name(tag)
-	pTaosSyn_obj->ExecuteInsertNRecordbyBuf(data_buf, field_num, record_num, table_fields_info, "rr6000", "meastest1", "meas_test", (const char**)tags_value, tagsnum);//, (const char**)tags_name
+	Ret = pTaosSyn_obj->ExecuteInsertNRecordbyBuf(data_buf, field_num, record_num, table_fields_info, "rr6000", "meastest1", "meas_test", (const char**)tags_value, tagsnum);//, (const char**)tags_name
 
 
 

@@ -15,29 +15,40 @@ CTaosSyn::CTaosSyn()
 
 CTaosSyn::~CTaosSyn()
 {
+	//释放taos句柄
+	taos_close(m_ptaos);
+	taos_cleanup();
 }
 
-int CTaosSyn::InitAccess(const CTaosSyn* TaosSyn_obj, TAOS* pTaos)
+int CTaosSyn::InitAccess(const CTaosSyn* TaosSyn_obj)
 {
-
 	//检查连接数据库的变量值是否存在
 	if (m_host == "" || m_user == "" || m_pass == "")
 	{
 		return VARIABLE_NO_VALUE_TAOS;
 	}
-
 	//m_ptaos = taos_connect("Linx.Linx-lzj", "root", "taosdata", NULL, 6030);//凝思句柄
 	m_ptaos = taos_connect(TaosSyn_obj->m_host.c_str(), TaosSyn_obj->m_user.c_str(), TaosSyn_obj->m_pass.c_str(), TaosSyn_obj->m_db.c_str(), TaosSyn_obj->m_port);//数据库句柄
-
-	pTaos = m_ptaos;
-
 	if (m_ptaos)
 		return SUCCESS_TAOS;
 	else
 		return HANDLE_FAILED_TAOS;
 }
 
-int CTaosSyn::ExecuteSqlCtlDB(const char* sqlstr, TAOS_RES* Res)
+int CTaosSyn::ExecuteSqlCtlDB(const char* sqlstr)
+{
+	//获取sql数据返回结果集
+	TAOS_RES* res;			//结果集字节流,这里写入无返回数据
+	res = taos_query(m_ptaos, sqlstr);
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+		taos_free_result(res);
+		return RES_EXE_FAILED;
+	}
+
+	return SUCCESS_TAOS;
+}
+int CTaosSyn::ExecuteSqlCtlDB(const char* sqlstr, TAOS_RES*& Res)
 {
 
 	//获取sql数据返回结果集
@@ -59,7 +70,13 @@ int CTaosSyn::ExecuteOneQueryDirectofRecordBytes(const char* szSqlSen, char*& sz
 	TAOS_RES* res;			//结果集字节流
 	TAOS_ROW row;			//一行记录数据
 
+	//返回变量的初始化
+	szResult = NULL;
+	Onerecordlen = 0;
 	Record_num = 0;
+	fields_info = 0;
+	fields_num = 0;
+
 	int blockrecord_num = 0;
 	//获取sql数据返回结果集
 	res = taos_query(m_ptaos, szSqlSen);
@@ -262,7 +279,12 @@ int CTaosSyn::ExecuteOneQueryDirectofRecordList(const char* szSqlSen, char**& Re
 	TAOS_ROW row;			//一行记录数据
 	int Onerecordlen = 0;	//一条记录长度
 
+	//返回变量初始化
+	Result = NULL;
 	Record_num = 0;
+	fields_info = NULL;
+	fields_num = 0;
+
 	//获取sql数据返回结果集
 	res = taos_query(m_ptaos, szSqlSen);
 	//检查结果集是否正常返回
@@ -448,8 +470,6 @@ int CTaosSyn::FreePtP(char**& Result, int& Record_num)
 
 int CTaosSyn::ExecuteInsertNRecordbyFile(const char* tbname, const char* FileLoc, int TAGNum, char** TAGsName)
 {
-
-
 	//INSERT INTO meters (current, voltage) VALUES (10.2, 219);
 	string sql = "INSERT INTO ";
 	sql.append(tbname);

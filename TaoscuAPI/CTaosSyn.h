@@ -29,14 +29,17 @@ public:
 	~CTaosSyn();
 	//连接数据库句柄，提前赋值连接数据库的成员变量：m_host、m_user、m_pass(默认m_db=NULL，m_port=6030，可不赋)
 	int InitAccess(
-		const CTaosSyn* TaosSyn_obj,				//[in]已赋值的对象
-		TAOS*			pTaos = 0					//[out]数据库句柄.连接数据库并返回数据库句柄。注：带const都为传入参数
+		const CTaosSyn* TaosSyn_obj					//[in]已赋值的对象。注：带const都为传入参数
 	);
 
 	//sql直接操作数据库，可以是 DQL、DML 或 DDL 语句。
 	int ExecuteSqlCtlDB(
+		const char* sqlstr							//[in]执行的sql语句
+	);
+	//重载，返回原生结果集
+	int ExecuteSqlCtlDB(
 		const char* sqlstr,							//[in]执行的sql语句
-		TAOS_RES*	res = 0							//[out]返回原生的结果集，若不是查询语句或不返回的sql，可缺省不填
+		TAOS_RES*&	res								//[out]返回原生的结果集，用taos接口解析
 	);
 
 	//获取sql全部记录，以一维字节流方式放入nResult,返回值0成功。
@@ -81,16 +84,16 @@ public:
 
 	//通过rr6000系统获取的记录buf字节流来将数据插入taos库中的子表
 	int ExecuteInsertNRecordbyBuf(
-		const char*		buf,						//传入的buf
-		const int		fields_num,					//buf里单条记录域数
-		const int		record_num,					//buf里记录数
-		const TABLE_HEAD_FIELDS_INFO* table_fields_info,//域信息
-		const char*		dbname,						//写入对应数据库
-		const char*		tbname,						//写入对应子表，子表存在下面部分可缺省
-		const char*		stbname = 0,				//若子表不存在，这里填创建的子表所属的超级表
-		const char**	TAGsValue = 0,				//stbname非空时，建子表所填的tag值，字符串请加上单引号，并且TAG值全填，后面TAGsName可缺省，TAGsNum不可缺省
-		const int		TAGsNum = 0,				//TAG数量
-		const char**	TAGsName = 0				//stbname非空时，建子表所填的tag字段名
+		const char*		buf,						//[in]传入的buf
+		const int		fields_num,					//[in]buf里单条记录域数
+		const int		record_num,					//[in]buf里记录数
+		const TABLE_HEAD_FIELDS_INFO* table_fields_info,//[in]域信息
+		const char*		dbname,						//[in]写入对应数据库
+		const char*		tbname,						//[in]写入对应子表，子表存在下面部分可缺省
+		const char*		stbname = 0,				//[in]若子表不存在，这里填创建的子表所属的超级表
+		const char**	TAGsValue = 0,				//[in]stbname非空时，建子表所填的tag值，字符串请加上单引号，并且TAG值全填，后面TAGsName可缺省，TAGsNum不可缺省
+		const int		TAGsNum = 0,				//[in]TAG数量
+		const char**	TAGsName = 0				//[in]stbname非空时，建子表所填的tag字段名
 	);
 
 
@@ -103,10 +106,6 @@ public://taos同步接口成员变量
 	string				m_pass;					//密码
 	string				m_db;					//数据库名字，如果用户没有提供，也可以正常连接，用户可以通过该连接创建新的数据库，如果用户提供了数据库名字，则说明该数据库用户已经创建好，缺省使用该数据库步骤
 	int					m_port;					//taosd程序监听的端口，默认6030
-
-
-
-
 
 };
 
