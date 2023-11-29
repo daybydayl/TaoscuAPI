@@ -1,0 +1,6 @@
+#double,nchar,int
+3.14,'test1',5
+1.24,'test2',6
+5.234,'test3',7
+2.765,'test4',8
+1.42,'test5',9

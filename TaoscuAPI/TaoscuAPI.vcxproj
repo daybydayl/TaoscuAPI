@@ -63,15 +63,27 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
-    <IncludePath>D:\myinstall\Qt-5.15.8\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\myinstall\Qt-5.15.8\lib;C:\TDengine\driver;D:\rr6000\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:/rr6000/src/vc/include;C:\TDengine\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\TDengine\driver;D:\rr6000\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <LibraryPath>C:\TDengine\driver;D:\rr6000\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>taos.lib;Qt5Cored.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>taos.lib;dnet_v2.lib;dbms_d_v2.lib;hds_common_dll.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>TAOSLIB_API;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Link>
+      <AdditionalDependencies>taos.lib;dnet_v2.lib;dbms_d_v2.lib;hds_common_dll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>TAOSLIB_API;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>

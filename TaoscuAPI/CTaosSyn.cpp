@@ -1,3 +1,6 @@
+#ifndef _WINDOWS
+	#include <unistd.h>
+#endif
 #include "CTaosSyn.h"
 
 CTaosSyn::CTaosSyn()
@@ -14,7 +17,7 @@ CTaosSyn::~CTaosSyn()
 {
 }
 
-int CTaosSyn::InitAccess(const CTaosSyn* TaosSyn_obj, TAOS* & pTaos)
+int CTaosSyn::InitAccess(const CTaosSyn* TaosSyn_obj, TAOS* pTaos)
 {
 
 	//检查连接数据库的变量值是否存在
@@ -34,6 +37,23 @@ int CTaosSyn::InitAccess(const CTaosSyn* TaosSyn_obj, TAOS* & pTaos)
 		return HANDLE_FAILED_TAOS;
 }
 
+int CTaosSyn::ExecuteSqlCtlDB(const char* sqlstr, TAOS_RES* Res)
+{
+
+	//获取sql数据返回结果集
+	TAOS_RES* res;			//结果集字节流,这里写入无返回数据
+	res = taos_query(m_ptaos, sqlstr);
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+		taos_free_result(res);
+		return RES_EXE_FAILED;
+	}
+
+	Res = res;
+	
+	return SUCCESS_TAOS;
+}
+
 int CTaosSyn::ExecuteOneQueryDirectofRecordBytes(const char* szSqlSen, char*& szResult, int& Record_num, int& Onerecordlen, TAOS_FIELD*& fields_info, int& fields_num, const int nExecDBNo)
 {
 	TAOS_RES* res;			//结果集字节流
@@ -51,7 +71,7 @@ int CTaosSyn::ExecuteOneQueryDirectofRecordBytes(const char* szSqlSen, char*& sz
 	if (res == NULL || taos_errno(res) != 0) {
 		//printf("failed to select, reason:%s\n", taos_errstr(res));
 		taos_free_result(res);
-		return RES_QUERY_FAILED;
+		return RES_EXE_FAILED;
 	}
 
 	//结果集中获取域信息数组
@@ -245,6 +265,12 @@ int CTaosSyn::ExecuteOneQueryDirectofRecordList(const char* szSqlSen, char**& Re
 	Record_num = 0;
 	//获取sql数据返回结果集
 	res = taos_query(m_ptaos, szSqlSen);
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+		//printf("failed to select, reason:%s\n", taos_errstr(res));
+		taos_free_result(res);
+		return RES_EXE_FAILED;
+	}
 
 	//建临时存放每条记录数据的指针
 	vector<char*>	ptr_vect;
@@ -419,3 +445,316 @@ int CTaosSyn::FreePtP(char**& Result, int& Record_num)
 	free(Result);
 	return SUCCESS_TAOS;
 }
+
+int CTaosSyn::ExecuteInsertNRecordbyFile(const char* tbname, const char* FileLoc, int TAGNum, char** TAGsName)
+{
+
+
+	//INSERT INTO meters (current, voltage) VALUES (10.2, 219);
+	string sql = "INSERT INTO ";
+	sql.append(tbname);
+	sql.append(" (");
+	for (int i = 0; i < TAGNum; i++)
+	{
+		sql += TAGsName[i];
+		if(i!=TAGNum-1)
+			sql += ", ";
+	}
+	sql += ") VALUES (";
+
+	ifstream file(FileLoc);
+	if (!file)
+		return OPEN_FIEL_FAILED;
+
+	string line;
+	string subchar;
+	char split = ',';//分隔符
+
+	int flagiftimestmp = 1;//首次判断文件是否加时间
+	int chkiftimestmp;//检查文件行中首列是否是时间戳
+	int overplus_fields = TAGNum;//文件中行剩余域数
+	while (getline(file, line))
+	{
+		char* cstr = new char[line.length() + 1];
+		strcpy(cstr, line.c_str()); // 将string转换为C字符串
+
+		subchar = strtok(cstr, &split);
+		if (subchar[0] == '#')
+			continue;
+
+		//判断是否有时间戳的列，有就加入，没有就按当前时间
+		chkiftimestmp = 0;
+		if (1 == flagiftimestmp)
+		{
+			for (int i = 0; i < subchar.size(); i++)
+				if (subchar[i] == '-' || subchar[i] == ':')
+					chkiftimestmp++;
+			flagiftimestmp = 0;
+		}
+		if (4 == chkiftimestmp)
+		{
+			sql += subchar.c_str();
+			overplus_fields--;
+		}
+		else
+		{
+			sql += "now, ";
+			sql += subchar.c_str();
+			overplus_fields -= 2;
+			
+		}
+		if(overplus_fields > 0)
+			sql += ", ";
+
+		for (int i = 0; i < overplus_fields; i++)
+		{
+			subchar = strtok(NULL, &split);
+			sql += subchar.c_str();
+			if(overplus_fields -1 != i)
+				sql += ", ";
+		}
+
+		sql += ')';
+
+		TAOS_RES* res = 0;
+		res = taos_query(m_ptaos, sql.c_str());
+		if (res == NULL)
+			return 0;
+
+		free(cstr);
+	}
+	file.close();
+
+
+
+
+	return SUCCESS_TAOS;
+}
+
+int CTaosSyn::ExecuteInsertNRecordbyBuf(const char* buf, const int fields_num, const int record_num, const TABLE_HEAD_FIELDS_INFO* table_fields_info, const char* dbname, const char* tbname, const char* stbname, const char** TAGsValue, const int TAGsNum, const char** TAGsName)
+{
+
+	//获取sql数据返回结果集
+	TAOS_RES* res;			//结果集字节流,这里写入无返回数据
+
+	string sq = "use ";
+	sq += dbname;
+	res = taos_query(m_ptaos, sq.c_str());
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+		
+		return ACCESS_DB_FAILED;
+	}
+	taos_free_result(res);
+	res = NULL;
+
+	bool ifstb = false;
+	bool ifallTAG = false;
+	string tmpsql1;
+	string tmpsql2;
+	//如果有超级表，先追加超级表通用语句
+	if (0 != stbname)
+	{
+		ifstb = true;
+
+		//如果有TAG名组，就不是全部TAG，需添加TAG名和TAG值
+		if (0 != TAGsName)
+		{
+			tmpsql1 += " USING ";
+			tmpsql1 += stbname;
+			tmpsql1 += ' ';
+			tmpsql1 += '(';
+			for (int i = 0; i < TAGsNum; i++)
+			{
+				tmpsql1 += TAGsName[i];
+				if (i < TAGsNum - 1)
+					tmpsql1 += ", ";
+			}
+			tmpsql1 += ") ";
+
+			tmpsql1 += "TAGS (";
+			for (int i = 0; i < TAGsNum; i++)
+			{
+				tmpsql1 += TAGsValue[i];
+				if (i < TAGsNum - 1)
+					tmpsql1 += ", ";
+			}
+			tmpsql1 += ") ";
+		}
+		else//若是全部TAG，则直接添加TAG值即可
+		{
+			ifallTAG = true;
+
+			tmpsql2 += " USING ";
+			tmpsql2 += stbname;
+			tmpsql2 += ' ';
+			tmpsql2 += "TAGS (";
+			for (int i = 0; i < TAGsNum; i++)
+			{
+				tmpsql2 += TAGsValue[i];
+				if (i < TAGsNum - 1)
+					tmpsql2 += ", ";
+			}
+			tmpsql2 += ") ";
+		}
+	}
+		
+	
+
+	int nfields_num = fields_num;
+	int nrecord_num = record_num;
+	//读取成功，开始使用表的域信息
+	//记录一条记录长度和域偏移量
+	int nOneRecordLen = 0;
+	int fieldIdx = 0;
+	int recordIdx = 0;
+	//域的偏移量数组，个数大于域数即可
+	vector<int>	shOffset;//保存每个域的偏移量
+	vector<string> ntmpstr;//保存每个数据字符串
+	for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+	{
+		if (fieldIdx == 0)
+			shOffset.push_back(0);
+		else
+			shOffset.push_back(table_fields_info[fieldIdx - 1].field_len + shOffset[fieldIdx - 1]);
+		
+		nOneRecordLen += table_fields_info[fieldIdx].field_len;
+
+		//顺便定义一些临时字串接收域数据
+		string str;
+		ntmpstr.push_back(str);
+	}
+
+	bool if_first_tb = true;
+	string sqlstr;
+	//填入字符串数据
+	for (recordIdx = 0; recordIdx < record_num; recordIdx++)
+	{
+		sqlstr = "INSERT INTO ";
+		sqlstr += tbname;
+		int fieldOffset = 0;
+		for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+		{
+			int field_type = table_fields_info[fieldOffset].data_type;
+
+			ntmpstr[fieldIdx] = "";
+			switch (field_type)
+			{
+			case DB_DATA_TYPE_NULL: {//0 未知类型
+				return DATA_TYPE_ERROR;
+			}
+				break;
+			case DB_DATA_TYPE_STRING: {//2字符串	
+				char str[DB_CHN_DEVICE_NAME_LEN] = { 0 };
+				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+				ntmpstr[fieldIdx] = str;
+			}
+				break;
+			case DB_DATA_TYPE_CHAR: {//3 字符
+				char chr = 0;
+				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = chr;
+			}
+				break;
+			case DB_DATA_TYPE_SHORT: {//4 短整型
+				short tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx]  = to_string(tmp);
+			}
+				break;
+			case DB_DATA_TYPE_INT: {//5 32位整型
+				int tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+				break;
+			case DB_DATA_TYPE_FLOAT: {//6 单精度浮点型
+				float tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+				break;
+			case DB_DATA_TYPE_DOUBLE: {//7 双精度浮点型
+				double tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+				break;
+			case DB_DATA_TYPE_DATETIME: {//9 时间型
+				return DATA_TYPE_ERROR;
+			}
+				break;
+			case DB_DATA_TYPE_BINARY: {//11 二进制串
+				return DATA_TYPE_ERROR;
+			}
+				break;
+			case DB_DATA_TYPE_INT64: {//12 64位整型
+				int64_t tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+				break;
+			default:
+				break;
+			}
+
+		}
+
+		if (ifstb == true && if_first_tb == true)
+		{
+			if (ifallTAG)
+				sqlstr += tmpsql2;
+			else
+				sqlstr += tmpsql1;
+
+			if_first_tb = false;
+		}
+			
+
+
+		sqlstr += " VALUES (now, ";
+		for (int i = 0; i < nfields_num; i++)
+		{
+			sqlstr += ntmpstr[i];
+			if (i < nfields_num - 1)
+				sqlstr += ", ";
+		}
+		sqlstr += ')';
+			
+
+		
+		res = taos_query(m_ptaos, sqlstr.c_str());
+		//检查结果集是否正常返回
+		if (res == NULL || taos_errno(res) != 0) {
+			taos_free_result(res);
+			return RES_EXE_FAILED;
+		}
+#ifdef _WINDOWS
+		Sleep(1);
+#else
+		usleep(1000);
+#endif // _WINDOWS
+
+		
+	}
+
+	ntmpstr.clear();
+
+	return SUCCESS_TAOS;
+}
+
+
+
