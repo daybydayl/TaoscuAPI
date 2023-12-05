@@ -19,7 +19,9 @@ void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj);
 void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
 
 void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj);
-void testExecuteInsertNRecordbyBuf(CTaosSyn*& pTaosSyn_obj);
+void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj);
+void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj);
+void test(CTaosSyn*& pTaosSyn_obj);
 
 int main(int argc, char* argv[])
 {
@@ -62,7 +64,9 @@ void testmaster(CTaosSyn*& pTaosSyn_obj)
 	//testExecuteSqlCtlDB(pTaosSyn_obj);
 	//testExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
 	//testExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
-	testExecuteInsertNRecordbyBuf(pTaosSyn_obj);
+	//testInsertNRecordtoOneTablebyBuf(pTaosSyn_obj);
+	testInsertNRecordtoNTablebyBuf(pTaosSyn_obj);
+	//test(pTaosSyn_obj);
 }
 
 void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
@@ -168,7 +172,7 @@ void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testExecuteInsertNRecordbyBuf(CTaosSyn*& pTaosSyn_obj)
+void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
@@ -238,7 +242,7 @@ void testExecuteInsertNRecordbyBuf(CTaosSyn*& pTaosSyn_obj)
 	tags_name[2] = chTAGName2;
 
 	//这里默认子表不存在，在rr6000库下所属meas_test超级表创建么meastest1子表，按全部tag域数据插入，meas_test超级表结构：ts,meas_value,meas_id(tag),fac_id(tag),meas_name(tag)
-	Ret = pTaosSyn_obj->ExecuteInsertNRecordbyBuf(data_buf, field_num, record_num, table_fields_info, "rr6000", "meastest1", "meas_test", (const char**)tags_value, tagsnum);//, (const char**)tags_name
+	Ret = pTaosSyn_obj->InsertNRecordtoOneTablebyBuf(data_buf, field_num, record_num, table_fields_info, "rr6000", "meastest1", "meas_test", (const char**)tags_value, tagsnum);//, (const char**)tags_name
 
 
 
@@ -247,5 +251,165 @@ void testExecuteInsertNRecordbyBuf(CTaosSyn*& pTaosSyn_obj)
 	free(data_buf);
 	pTaosSyn_obj->FreePtP(tags_value, tagsnum);
 	pTaosSyn_obj->FreePtP(tags_name, tagsnum);
+
+}
+
+void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj)
+{
+	//从rr6000中取记录集
+	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
+	int Ret = -1;
+
+	int record_num = 0;
+	int result_len = 0;
+	int recodeIdx = 0;
+	int fieldIdx = 0;
+
+	//域的偏移量数组，个数大于域数即可
+	int shOffset[16] = { 0 };
+	const int field_num = 4;//查4个域
+	char chEngName[field_num][32];//32为域英文长度
+	TABLE_HEAD_FIELDS_INFO* table_fields_info = (TABLE_HEAD_FIELDS_INFO*)malloc(sizeof(TABLE_HEAD_FIELDS_INFO));
+	if (table_fields_info == NULL)
+		return;
+
+	//填要查的英文名
+	strcpy(chEngName[0], "meas_id");
+	strcpy(chEngName[1], "fac_id");
+	strcpy(chEngName[2], "meas_name");
+	strcpy(chEngName[3], "meas_value");
+	//定义返回buf,初始化大小随意
+	char* data_buf = (char*)malloc(6);
+
+	//通过英文域名读取表的域信息和记录数据集
+	Ret = rdb_net.read_table_data_by_english_names_net(
+		MEAS_INFO_NO,
+		DNET_APP_TYPE_SCADA,
+		chEngName,
+		field_num,
+		table_fields_info,
+		data_buf,
+		record_num,
+		result_len
+	);
+	if (Ret < 0)
+	{
+		FREE((char*&)table_fields_info);
+		free(data_buf);
+		return;
+	}
+
+	//接口使用部分
+	const int valuesnum = 1;//超表中除了时间戳的数据值域个数
+	const int tagsnum = 2;//需要填tag值的超表tags域数
+	short tbname_hfield_no = table_fields_info[0].hdb_field_no;//做表名的历史域号
+	short values_hfield_no[valuesnum];//存放数据值域的历史域号数组，便于接口内部做找对应数据
+	values_hfield_no[0] = table_fields_info[3].hdb_field_no;
+
+	short TAGs_hfield_no[tagsnum];//存放tag值域的历史域号数组
+	TAGs_hfield_no[0] = table_fields_info[1].hdb_field_no;
+	TAGs_hfield_no[1] = table_fields_info[2].hdb_field_no;
+
+	Ret = pTaosSyn_obj->InsertNRecordtoNTablebyBuf(
+		data_buf,				//传入的buf
+		field_num,				//buf里单条记录域数
+		record_num,				//buf里记录数
+		table_fields_info,		//域信息
+		"lzj",					//需写入的对应数据库
+		"lzj_meter",			//超级表务必存在，是按记录建对应子表
+		tbname_hfield_no,		//各条记录中要做表名的历史域号
+		values_hfield_no,		//各条记录中做数据值的历史域号数组
+		TAGs_hfield_no,			//各条记录中做TAG数据的历史域号数组，这里TAG值全填，所有最后的TAGsName缺省了
+		tagsnum					//TAG数量
+	);
+
+
+	//释放空间
+	FREE((char*&)table_fields_info);
+	free(data_buf);
+
+}
+
+void test(CTaosSyn*& pTaosSyn_obj)
+{
+	//从rr6000中取记录集
+	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
+	int Ret = -1;
+
+	int record_num = 0;
+	int result_len = 0;
+	int recodeIdx = 0;
+	int fieldIdx = 0;
+
+	//域的偏移量数组，个数大于域数即可
+	int shOffset[16] = { 0 };
+	const int field_num = 4;//查4个域
+	char chEngName[field_num][32];//32为域英文长度
+	TABLE_HEAD_FIELDS_INFO* table_fields_info = (TABLE_HEAD_FIELDS_INFO*)malloc(sizeof(TABLE_HEAD_FIELDS_INFO));
+	if (table_fields_info == NULL)
+		return;
+
+	//填要查的英文名
+	strcpy(chEngName[0], "sw_id");
+	strcpy(chEngName[1], "sw_name");
+	strcpy(chEngName[2], "sw_no");
+	strcpy(chEngName[3], "yx_value");
+	//定义返回buf,初始化大小随意
+	char* data_buf = (char*)malloc(6);
+
+	//通过英文域名读取表的域信息和记录数据集
+	Ret = rdb_net.read_table_data_by_english_names_net(
+		SW_INFO_NO,
+		DNET_APP_TYPE_SCADA,
+		chEngName,
+		field_num,
+		table_fields_info,
+		data_buf,
+		record_num,
+		result_len
+	);
+	if (Ret < 0)
+	{
+		FREE((char*&)table_fields_info);
+		free(data_buf);
+		return;
+	}
+
+	//接口使用部分
+	const int valuesnum = 1;//超表中除了时间戳的数据值域个数
+	const int tagsnum = 2;//需要填tag值的超表tags域数
+	short tdname_hfield_no = table_fields_info[0].hdb_field_no;//做表名的历史域号
+	short values_hfield_no[valuesnum];//存放数据值域的历史域号数组，便于接口内部做找对应数据
+	values_hfield_no[0] = table_fields_info[3].hdb_field_no;
+
+	short TAGs_hfield_no[tagsnum];//存放tag值域的历史域号数组
+	TAGs_hfield_no[0] = table_fields_info[1].hdb_field_no;
+	TAGs_hfield_no[1] = table_fields_info[2].hdb_field_no;
+
+	const char** TAGsName = (const char**)malloc(tagsnum * sizeof(char*));
+	char tag1[12] = "sw_name";
+	char tag2[12] = "sw_no";
+	TAGsName[0] = tag1;
+	TAGsName[1] = tag2;
+
+
+	Ret = pTaosSyn_obj->InsertNRecordtoNTablebyBuf(
+		data_buf,				//传入的buf
+		field_num,				//buf里单条记录域数
+		record_num,				//buf里记录数
+		table_fields_info,		//域信息
+		"lzj",					//需写入的对应数据库
+		"sw_meter",			//超级表务必存在，是按记录建对应子表
+		tdname_hfield_no,		//各条记录中要做表名的历史域号
+		values_hfield_no,		//各条记录中做数据值的历史域号数组
+		TAGs_hfield_no,			//各条记录中做TAG数据的历史域号数组，这里TAG值全填，所有最后的TAGsName缺省了
+		tagsnum,				//TAG数量
+		TAGsName
+	);
+
+
+	//释放空间
+	FREE((char*&)table_fields_info);
+	free(data_buf);
 
 }

@@ -551,7 +551,7 @@ int CTaosSyn::ExecuteInsertNRecordbyFile(const char* tbname, const char* FileLoc
 	return SUCCESS_TAOS;
 }
 
-int CTaosSyn::ExecuteInsertNRecordbyBuf(const char* buf, const int fields_num, const int record_num, const TABLE_HEAD_FIELDS_INFO* table_fields_info, const char* dbname, const char* tbname, const char* stbname, const char** TAGsValue, const int TAGsNum, const char** TAGsName)
+int CTaosSyn::InsertNRecordtoOneTablebyBuf(const char* buf, const int fields_num, const int record_num, const TABLE_HEAD_FIELDS_INFO* table_fields_info, const char* dbname, const char* tbname, const char* stbname, const char** TAGsValue, const int TAGsNum, const char** TAGsName)
 {
 
 	//获取sql数据返回结果集
@@ -668,15 +668,18 @@ int CTaosSyn::ExecuteInsertNRecordbyBuf(const char* buf, const int fields_num, c
 				char str[DB_CHN_DEVICE_NAME_LEN] = { 0 };
 				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
 				fieldOffset++;
-				ntmpstr[fieldIdx] = str;
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += str;
+				ntmpstr[fieldIdx] += '\'';
 			}
 				break;
 			case DB_DATA_TYPE_CHAR: {//3 字符
 				char chr = 0;
 				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
 				fieldOffset++;
-
-				ntmpstr[fieldIdx] = chr;
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += chr;
+				ntmpstr[fieldIdx] += '\'';
 			}
 				break;
 			case DB_DATA_TYPE_SHORT: {//4 短整型
@@ -769,6 +772,271 @@ int CTaosSyn::ExecuteInsertNRecordbyBuf(const char* buf, const int fields_num, c
 #endif // _WINDOWS
 
 		
+	}
+
+	ntmpstr.clear();
+
+	return SUCCESS_TAOS;
+}
+
+int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, const int record_num, const TABLE_HEAD_FIELDS_INFO* table_fields_info, const char* dbname, const char* stbname, const short tbname_hfield_no, const short* values_hfield_no, const short* TAGs_hfield_no, const int TAGsNum, const char** TAGsName)
+{
+	//获取sql数据返回结果集
+	TAOS_RES* res;			//结果集字节流,这里写入无返回数据
+
+	string sq = "use ";
+	sq += dbname;
+	res = taos_query(m_ptaos, sq.c_str());
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+
+		return ACCESS_DB_FAILED;
+	}
+	taos_free_result(res);
+	res = NULL;
+
+
+	bool ifallTAG = false;
+	string tmpsql1;//中间部分是否加指定tag部分sql
+	//如果有TAG名组，就不是全部TAG，需添加TAG名和TAG值
+	if (0 != TAGsName)
+	{
+		tmpsql1 += " USING ";
+		tmpsql1 += stbname;
+		tmpsql1 += ' ';
+		tmpsql1 += '(';
+		for (int i = 0; i < TAGsNum; i++)
+		{
+			tmpsql1 += TAGsName[i];
+			if (i < TAGsNum - 1)
+				tmpsql1 += ", ";
+		}
+		tmpsql1 += ") ";
+
+		tmpsql1 += "TAGS (";
+	}
+	else//若是全部TAG，则直接添加TAG值即可
+	{
+		ifallTAG = true;
+
+		tmpsql1 += " USING ";
+		tmpsql1 += stbname;
+		tmpsql1 += ' ';
+		tmpsql1 += "TAGS (";
+	}
+
+	int nfields_num = fields_num;
+	int nrecord_num = record_num;
+	//读取成功，开始使用表的域信息
+	//记录一条记录长度和域偏移量
+	int nOneRecordLen = 0;
+	int fieldIdx = 0;
+	int recordIdx = 0;
+	//域的偏移量数组，个数大于域数即可
+	vector<int>	shOffset;//保存每个域的偏移量
+	vector<string> ntmpstr;//保存每个数据字符串
+	for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+	{
+		if (fieldIdx == 0)
+			shOffset.push_back(0);
+		else
+			shOffset.push_back(table_fields_info[fieldIdx - 1].field_len + shOffset[fieldIdx - 1]);
+
+		nOneRecordLen += table_fields_info[fieldIdx].field_len;
+
+		//顺便定义一些临时字串接收域数据
+		string str;
+		ntmpstr.push_back(str);
+	}
+
+
+	map<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用
+	string sqlstr;
+
+	//填入字符串数据
+	for (recordIdx = 0; recordIdx < 100; recordIdx++)
+	{
+		
+
+		int fieldOffset = 0;
+		for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+		{
+			int field_type = table_fields_info[fieldOffset].data_type;
+
+			ntmpstr[fieldIdx] = "";
+			switch (field_type)
+			{
+			case DB_DATA_TYPE_NULL: {//0 未知类型
+				return DATA_TYPE_ERROR;
+			}
+								  break;
+			case DB_DATA_TYPE_STRING: {//2字符串	
+				char str[DB_CHN_DEVICE_NAME_LEN] = { 0 };
+				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				////测试编码是否为GBK 打开文件以进行写操作，如果文件不存在则创建
+				//std::ofstream outputFile("example.txt");
+				//// 检查文件是否成功打开
+				//if (!outputFile.is_open()) {
+				//	std::cerr << "Error opening the file for writing." << std::endl;
+				//	return 1; // 返回错误代码
+				//}
+				//// 写入数据到文件
+				//outputFile << str;
+				//// 关闭文件
+				//outputFile.close();
+
+				/*===================编码是GBK，但转换后写入还是乱码！！！！！！！！！！！！！！！！==============================*/
+				//// C++原生库方法不行，创建一个用于转换的转换器对象
+				//wstring_convert<codecvt_byname<wchar_t, char, mbstate_t>> converter(new codecvt_byname<wchar_t, char, mbstate_t>("GBK"));
+				//// 将原始字符串转换为宽字符字符串
+				//wstring wide_string = converter.from_bytes(str);
+				//// 创建另一个用于转换的转换器对象
+				//wstring_convert<codecvt_utf8<wchar_t>, wchar_t> utf8_converter;
+				//// 将宽字符字符串转换为UTF-8
+				//string utf8_string = utf8_converter.to_bytes(wide_string);
+
+				//获取GBK和UTF-8的编解码器
+				QTextCodec* gbkCodec = QTextCodec::codecForName("GBK");
+				// 将GBK编码的字符串转换为Unicode字符串
+				QString unicodeStr = gbkCodec->toUnicode(str);
+				// 将Unicode字符串转换为UTF-8编码的字符串
+				QByteArray utf8Bytes;
+				utf8Bytes = unicodeStr.toUtf8();
+				char* utf8_str = utf8Bytes.data();
+
+
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += utf8_str;
+				ntmpstr[fieldIdx] += '\'';
+
+			}
+									break;
+			case DB_DATA_TYPE_CHAR: {//3 字符
+				char chr = NULL;
+				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				short stmp = (short)chr;
+
+				//ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += to_string(stmp);
+				//ntmpstr[fieldIdx] += '\'';
+			}
+								  break;
+			case DB_DATA_TYPE_SHORT: {//4 短整型
+				short tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			case DB_DATA_TYPE_INT: {//5 32位整型
+				int tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								 break;
+			case DB_DATA_TYPE_FLOAT: {//6 单精度浮点型
+				float tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			case DB_DATA_TYPE_DOUBLE: {//7 双精度浮点型
+				double tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+									break;
+			case DB_DATA_TYPE_DATETIME: {//9 时间型
+				return DATA_TYPE_ERROR;
+			}
+									  break;
+			case DB_DATA_TYPE_BINARY: {//11 二进制串
+				return DATA_TYPE_ERROR;
+			}
+									break;
+			case DB_DATA_TYPE_INT64: {//12 64位整型
+				int64_t tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			default:
+				break;
+			}
+
+			
+			//域号对应域值存入map
+			FldNotoV[table_fields_info[fieldOffset-1].hdb_field_no] = ntmpstr[fieldIdx];
+
+		}
+
+		//拼接整条sql
+		sqlstr = "INSERT INTO ";
+		sqlstr += stbname[0];//这里防止多张超级表有相同子表名做的措施
+		sqlstr += to_string(sizeof(stbname));
+		sqlstr += "_";
+
+		//sqlstr += ntmpstr[0];
+		sqlstr += FldNotoV[tbname_hfield_no];//指定域号值做子表名
+		sqlstr += tmpsql1;
+
+		//添加tag的value通过历史域号来给
+		FldNotoV.erase(tbname_hfield_no);//使用过的都给擦除
+		for (int i = 0; i < TAGsNum; i++)
+		{
+			sqlstr += FldNotoV[TAGs_hfield_no[i]];
+			FldNotoV.erase(TAGs_hfield_no[i]);
+			if (i < TAGsNum - 1)
+				sqlstr += ',';
+		}
+
+		sqlstr += ") ";
+		sqlstr += " VALUES (now, ";
+
+		
+		//先标记一个map中倒数第一个数据的位置
+		map<short, string>::iterator itlast = FldNotoV.end();
+		--itlast;
+
+		// 使用迭代器遍历
+		for (map<short, string>::iterator it = FldNotoV.begin(); it != FldNotoV.end(); ++it)
+		{
+			sqlstr += it->second;
+			if (it != itlast)
+				sqlstr += ", ";
+			
+		}
+		sqlstr += ')';
+
+
+		res = taos_query(m_ptaos, sqlstr.c_str());
+		//检查结果集是否正常返回
+		int ret = 0;
+		ret = taos_errno(res);
+		if (res == NULL || ret != 0) {
+			taos_free_result(res);
+			return RES_EXE_FAILED;
+		}
+#ifdef _WINDOWS
+		Sleep(1);
+#else
+		usleep(1000);
+#endif // _WINDOWS
+
+
 	}
 
 	ntmpstr.clear();
