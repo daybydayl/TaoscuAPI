@@ -20,8 +20,8 @@ void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
 
 void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj);
 void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj);
-void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj);
-void test(CTaosSyn*& pTaosSyn_obj);
+void testInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj);
+void testInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj);
 
 int main(int argc, char* argv[])
 {
@@ -65,8 +65,8 @@ void testmaster(CTaosSyn*& pTaosSyn_obj)
 	//testExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
 	//testExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
 	//testInsertNRecordtoOneTablebyBuf(pTaosSyn_obj);
-	testInsertNRecordtoNTablebyBuf(pTaosSyn_obj);
-	//test(pTaosSyn_obj);
+	testInsertNRecordtoNTablebyBuf1(pTaosSyn_obj);
+	//testInsertNRecordtoNTablebyBuf2(pTaosSyn_obj);
 }
 
 void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
@@ -254,7 +254,7 @@ void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj)
+void testInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
@@ -267,17 +267,19 @@ void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 
 	//域的偏移量数组，个数大于域数即可
 	int shOffset[16] = { 0 };
-	const int field_num = 4;//查4个域
+	const int field_num = 6;//查4个域
 	char chEngName[field_num][32];//32为域英文长度
 	TABLE_HEAD_FIELDS_INFO* table_fields_info = (TABLE_HEAD_FIELDS_INFO*)malloc(sizeof(TABLE_HEAD_FIELDS_INFO));
 	if (table_fields_info == NULL)
 		return;
 
 	//填要查的英文名
-	strcpy(chEngName[0], "meas_id");
+	strcpy(chEngName[0], "meas_id");//做子表名部分
 	strcpy(chEngName[1], "fac_id");
 	strcpy(chEngName[2], "meas_name");
-	strcpy(chEngName[3], "meas_value");
+	strcpy(chEngName[3], "meas_status");
+	strcpy(chEngName[4], "meas_value");
+	strcpy(chEngName[5], "meas_id");//做TAG部分
 	//定义返回buf,初始化大小随意
 	char* data_buf = (char*)malloc(6);
 
@@ -300,15 +302,17 @@ void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 	}
 
 	//接口使用部分
-	const int valuesnum = 1;//超表中除了时间戳的数据值域个数
-	const int tagsnum = 2;//需要填tag值的超表tags域数
+	const int valuesnum = 2;//超表中除了时间戳的数据值域个数
+	const int tagsnum = 3;//需要填tag值的超表tags域数
 	short tbname_hfield_no = table_fields_info[0].hdb_field_no;//做表名的历史域号
 	short values_hfield_no[valuesnum];//存放数据值域的历史域号数组，便于接口内部做找对应数据
 	values_hfield_no[0] = table_fields_info[3].hdb_field_no;
+	values_hfield_no[1] = table_fields_info[4].hdb_field_no;
 
 	short TAGs_hfield_no[tagsnum];//存放tag值域的历史域号数组
 	TAGs_hfield_no[0] = table_fields_info[1].hdb_field_no;
 	TAGs_hfield_no[1] = table_fields_info[2].hdb_field_no;
+	TAGs_hfield_no[2] = table_fields_info[5].hdb_field_no;
 
 	Ret = pTaosSyn_obj->InsertNRecordtoNTablebyBuf(
 		data_buf,				//传入的buf
@@ -330,7 +334,7 @@ void testInsertNRecordtoNTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void test(CTaosSyn*& pTaosSyn_obj)
+void testInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/

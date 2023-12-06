@@ -11,7 +11,7 @@
 //#include "CCommonHead.h"
 using namespace std;
 
-#include "taos.h"
+#include "taos.h"//若不存在，改自己路径所在位置
 //包含网络子系统头文件
 #include "dnet_all.h"
 //包含历史库子系统头文件
@@ -74,8 +74,9 @@ public:
 		int&			Record_num					//[in]存放一级指针数
 	);
 
-	
-	int ExecuteInsertNRecordbyFile(/*=================未完成，待定，看是否需要===========================*/
+
+	/*=================未完成，待定，看是否需要===========================*/
+	int ExecuteInsertNRecordbyFile(
 		const char*		tbname,						//[in]需要插入数据的库对应表名，如rr6000.meas1(普通表)、rr6000.meas_meter1(超级表)
 		const char*		FileLoc,					//[in]数据文件路径
 		int				TAGNum = 0,					//[in]向超级表对应的tag数量，若目标表为超级表，才需此两个参数，否则缺省即可

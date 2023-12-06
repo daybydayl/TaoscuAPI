@@ -849,15 +849,18 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 		ntmpstr.push_back(str);
 	}
 
-
-	map<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用
+	//map<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用,
+	//multimap与map不同的是，他可以填入多个相同的关键字
+	multimap<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用
 	string sqlstr;
+	
 
 	//填入字符串数据
-	for (recordIdx = 0; recordIdx < 100; recordIdx++)
+	for (recordIdx = 0; recordIdx < record_num; recordIdx++)
 	{
 		
-
+		sqlstr.clear();
+		FldNotoV.clear();
 		int fieldOffset = 0;
 		for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
 		{
@@ -978,27 +981,33 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 			}
 
 			
-			//域号对应域值存入map
-			FldNotoV[table_fields_info[fieldOffset-1].hdb_field_no] = ntmpstr[fieldIdx];
+			//域号对应域值存入map，这里fieldOffset-1是因为上面都++了一下
+			//FldNotoV[table_fields_info[fieldOffset-1].hdb_field_no] = ntmpstr[fieldIdx];//map做法
+			FldNotoV.insert(make_pair(table_fields_info[fieldOffset - 1].hdb_field_no, ntmpstr[fieldIdx]));
 
 		}
 
 		//拼接整条sql
 		sqlstr = "INSERT INTO ";
-		sqlstr += stbname[0];//这里防止多张超级表有相同子表名做的措施
-		sqlstr += to_string(sizeof(stbname));
+		sqlstr += stbname[0];//增加子表名唯一性
+		sqlstr += to_string(string(stbname).length());//加个超表名字符个数，增加子表名唯一性
 		sqlstr += "_";
 
-		//sqlstr += ntmpstr[0];
-		sqlstr += FldNotoV[tbname_hfield_no];//指定域号值做子表名
+		//sqlstr += FldNotoV[tbname_hfield_no];//指定域号值做子表名,map做法
+		multimap<short, string>::iterator it = FldNotoV.lower_bound(tbname_hfield_no);//接收关键字类型的第一个位置
+		sqlstr += it->second;
+
 		sqlstr += tmpsql1;
 
 		//添加tag的value通过历史域号来给
-		FldNotoV.erase(tbname_hfield_no);//使用过的都给擦除
+		//FldNotoV.erase(tbname_hfield_no);//使用过的都给擦除，map做法
+		FldNotoV.erase(it);
 		for (int i = 0; i < TAGsNum; i++)
 		{
-			sqlstr += FldNotoV[TAGs_hfield_no[i]];
-			FldNotoV.erase(TAGs_hfield_no[i]);
+			it = FldNotoV.lower_bound(TAGs_hfield_no[i]);
+			sqlstr += it->second;
+			//FldNotoV.erase(TAGs_hfield_no[i]);
+			FldNotoV.erase(it);
 			if (i < TAGsNum - 1)
 				sqlstr += ',';
 		}
@@ -1007,20 +1016,19 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 		sqlstr += " VALUES (now, ";
 
 		
-		//先标记一个map中倒数第一个数据的位置
-		map<short, string>::iterator itlast = FldNotoV.end();
+		//先标记一个map|multimap中倒数第一个数据的位置
+		multimap<short, string>::iterator itlast = FldNotoV.end();
 		--itlast;
 
 		// 使用迭代器遍历
-		for (map<short, string>::iterator it = FldNotoV.begin(); it != FldNotoV.end(); ++it)
+		for (multimap<short, string>::iterator it = FldNotoV.begin(); it != FldNotoV.end(); ++it)
 		{
 			sqlstr += it->second;
 			if (it != itlast)
 				sqlstr += ", ";
 			
 		}
-		sqlstr += ')';
-
+		sqlstr += ") ";
 
 		res = taos_query(m_ptaos, sqlstr.c_str());
 		//检查结果集是否正常返回
