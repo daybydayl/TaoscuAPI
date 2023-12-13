@@ -105,13 +105,29 @@ public:
 		const TABLE_HEAD_FIELDS_INFO* table_fields_info,//[in]域信息
 		const char*		dbname,						//[in]写入对应数据库
 		const char*		stbname,					//[in]超级表务必存在，是按记录建对应子表
-		const short		tdname_hfield_no,			//[in]各条记录中要做表名的历史域号(hdb_field_no)
+		const short		tbname_hfield_no,			//[in]各条记录中要做表名的历史域号(hdb_field_no)
 		const short*	values_hfield_no,			//[in]各条记录中做数据值的历史域号数组
-		const short*	TAGs_hfield_no = 0,			//[in]各条记录中做TAG数据的历史域号数组，字符串请加上单引号，若TAG值全填，后面TAGsName可缺省，TAGsNum不可缺省
-		const int		TAGsNum = 0,				//[in]TAG数量
+		const short*	TAGs_hfield_no,				//[in]各条记录中做TAG数据的历史域号数组，字符串请加上单引号，若TAG值全填，后面TAGsName可缺省，TAGsNum不可缺省
+		const int		TAGsNum,					//[in]TAG数量
 		const char**	TAGsName = 0				//[in]TAGs_hfield_no数组非全部tag时，建子表所填的超表tag字段名，其他TAG值会默认NULL
 	);
 
+	//也可以直接当建表用
+	//通过采样方式不为非采样时才建子表，若有采样周期，周期为1s时才建子表
+	int InsertNRecordtoNTablebyBufofSample(
+		const char*		buf,						//[in]传入的buf
+		const int		fields_num,					//[in]buf里单条记录域数
+		const int		record_num,					//[in]buf里记录数
+		const TABLE_HEAD_FIELDS_INFO* table_fields_info,//[in]域信息
+		const char*		dbname,						//[in]写入对应数据库
+		const char*		stbname,					//[in]超级表务必存在，是按记录建对应子表
+		const short		tbname_hfield_no,			//[in]各条记录中要做表名的历史域号(hdb_field_no)
+		const short*	values_hfield_no,			//[in]各条记录中做数据值的历史域号数组
+		const short*	TAGs_hfield_no,				//[in]各条记录中做TAG数据的历史域号数组，字符串请加上单引号，若TAG值全填，后面TAGsName可缺省，TAGsNum不可缺省
+		const int		TAGsNum,					//[in]TAG数量
+		const short*	sample_modelandintervel = 0,//[in]采样方式的历史域号和采样周期的域号，若无采样周期，填负数或不存在的历史域号即可
+		const char**	TAGsName = 0				//[in]TAGs_hfield_no数组非全部tag时，建子表所填的超表tag字段名，其他TAG值会默认NULL
+	);
 
 
 

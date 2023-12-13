@@ -182,9 +182,9 @@ int CTaosSyn::ExecuteOneQueryDirectofRecordBytes(const char* szSqlSen, char*& sz
 			case TSDB_DATA_TYPE_BIGINT:// 5
 			case TSDB_DATA_TYPE_TIMESTAMP:// 9
 				{
-					int64_t tmp = *(int64_t*)row[j];
-					memcpy(buf_Onerecord + field_Offset, (char*)&tmp, sizeof(int64_t));
-					field_Offset += sizeof(int64_t);
+					uint64_t tmp = *(uint64_t*)row[j];
+					memcpy(buf_Onerecord + field_Offset, (char*)&tmp, sizeof(uint64_t));
+					field_Offset += sizeof(uint64_t);
 				}
 				break;
 			case TSDB_DATA_TYPE_UBIGINT:// 14
@@ -660,7 +660,7 @@ int CTaosSyn::InsertNRecordtoOneTablebyBuf(const char* buf, const int fields_num
 			ntmpstr[fieldIdx] = "";
 			switch (field_type)
 			{
-			case DB_DATA_TYPE_NULL: {//0 未知类型
+			case DB_DATA_TYPE_NULL: {//0 未知类型，不解析
 				return DATA_TYPE_ERROR;
 			}
 				break;
@@ -715,10 +715,23 @@ int CTaosSyn::InsertNRecordtoOneTablebyBuf(const char* buf, const int fields_num
 			}
 				break;
 			case DB_DATA_TYPE_DATETIME: {//9 时间型
-				return DATA_TYPE_ERROR;
+				on_time_t	curtime;				//occur_time临时接收
+				memcpy((char*)&curtime, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
+				fieldOffset++;
+
+				const time_t cur = curtime;
+				struct tm tminfo;	//C++自带
+				localtime_s(&tminfo, &cur);//将的得到时间转成结构体tm类型
+				char strtime[80];
+				strftime(strtime, 80, "%Y-%m-%d %H:%M:%S", &tminfo);//把tm结构体已模型放入字符串中
+
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] = strtime;
+				ntmpstr[fieldIdx] += '\'';
+
 			}
 				break;
-			case DB_DATA_TYPE_BINARY: {//11 二进制串
+			case DB_DATA_TYPE_BINARY: {//11 二进制串，不解析
 				return DATA_TYPE_ERROR;
 			}
 				break;
@@ -861,22 +874,21 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 		
 		sqlstr.clear();
 		FldNotoV.clear();
-		int fieldOffset = 0;
 		for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
 		{
-			int field_type = table_fields_info[fieldOffset].data_type;
+			int field_type = table_fields_info[fieldIdx].data_type;
 
 			ntmpstr[fieldIdx] = "";
 			switch (field_type)
 			{
-			case DB_DATA_TYPE_NULL: {//0 未知类型
+			case DB_DATA_TYPE_NULL: {//0 未知类型，不解析
 				return DATA_TYPE_ERROR;
 			}
 								  break;
 			case DB_DATA_TYPE_STRING: {//2字符串	
 				char str[DB_CHN_DEVICE_NAME_LEN] = { 0 };
-				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+				//fieldOffset++;
 
 				////测试编码是否为GBK 打开文件以进行写操作，如果文件不存在则创建
 				//std::ofstream outputFile("example.txt");
@@ -918,8 +930,7 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 									break;
 			case DB_DATA_TYPE_CHAR: {//3 字符
 				char chr = NULL;
-				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				short stmp = (short)chr;
 
@@ -930,48 +941,54 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 								  break;
 			case DB_DATA_TYPE_SHORT: {//4 短整型
 				short tmp = 0;
-				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				ntmpstr[fieldIdx] = to_string(tmp);
 			}
 								   break;
 			case DB_DATA_TYPE_INT: {//5 32位整型
 				int tmp = 0;
-				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				ntmpstr[fieldIdx] = to_string(tmp);
 			}
 								 break;
 			case DB_DATA_TYPE_FLOAT: {//6 单精度浮点型
 				float tmp = 0;
-				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				ntmpstr[fieldIdx] = to_string(tmp);
 			}
 								   break;
 			case DB_DATA_TYPE_DOUBLE: {//7 双精度浮点型
 				double tmp = 0;
-				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				ntmpstr[fieldIdx] = to_string(tmp);
 			}
 									break;
 			case DB_DATA_TYPE_DATETIME: {//9 时间型
-				return DATA_TYPE_ERROR;
+				on_time_t	curtime;				//occur_time临时接收
+				memcpy((char*)&curtime, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				const time_t cur = curtime;
+				struct tm tminfo;	//C++自带
+				localtime_s(&tminfo, &cur);//将的得到时间转成结构体tm类型
+				char strtime[80];
+				strftime(strtime, 80, "%Y-%m-%d %H:%M:%S", &tminfo);//把tm结构体已模型放入字符串中
+
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += strtime;
+				ntmpstr[fieldIdx] += '\'';
 			}
 									  break;
-			case DB_DATA_TYPE_BINARY: {//11 二进制串
+			case DB_DATA_TYPE_BINARY: {//11 二进制串，不解析
 				return DATA_TYPE_ERROR;
 			}
 									break;
 			case DB_DATA_TYPE_INT64: {//12 64位整型
 				int64_t tmp = 0;
-				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldOffset], table_fields_info[fieldOffset].field_len);
-				fieldOffset++;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
 
 				ntmpstr[fieldIdx] = to_string(tmp);
 			}
@@ -981,16 +998,16 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 			}
 
 			
-			//域号对应域值存入map，这里fieldOffset-1是因为上面都++了一下
-			//FldNotoV[table_fields_info[fieldOffset-1].hdb_field_no] = ntmpstr[fieldIdx];//map做法
-			FldNotoV.insert(make_pair(table_fields_info[fieldOffset - 1].hdb_field_no, ntmpstr[fieldIdx]));
+			//域号对应域值存入map
+			//FldNotoV[table_fields_info[fieldIdx].hdb_field_no] = ntmpstr[fieldIdx];//map做法
+			FldNotoV.insert(make_pair(table_fields_info[fieldIdx].hdb_field_no, ntmpstr[fieldIdx]));
 
 		}
 
 		//拼接整条sql
 		sqlstr = "INSERT INTO ";
-		sqlstr += stbname[0];//增加子表名唯一性
-		sqlstr += to_string(string(stbname).length());//加个超表名字符个数，增加子表名唯一性
+		sqlstr += stbname;//增加子表名唯一性
+		//sqlstr += to_string(string(stbname).length());//加个超表名字符个数，增加子表名唯一性
 		sqlstr += "_";
 
 		//sqlstr += FldNotoV[tbname_hfield_no];//指定域号值做子表名,map做法
@@ -1038,6 +1055,336 @@ int CTaosSyn::InsertNRecordtoNTablebyBuf(const char* buf, const int fields_num, 
 			taos_free_result(res);
 			return RES_EXE_FAILED;
 		}
+#ifdef _WINDOWS
+		Sleep(1);
+#else
+		usleep(1000);
+#endif // _WINDOWS
+
+
+	}
+
+	ntmpstr.clear();
+
+	return SUCCESS_TAOS;
+}
+
+int CTaosSyn::InsertNRecordtoNTablebyBufofSample(const char* buf, const int fields_num, const int record_num, const TABLE_HEAD_FIELDS_INFO* table_fields_info, const char* dbname, const char* stbname, const short tbname_hfield_no, const short* values_hfield_no, const short* TAGs_hfield_no, const int TAGsNum, const short* sample_modelandintervel, const char** TAGsName)
+{
+	//定义一个sql是否执行的flag
+	bool ifexe_flag1 = true;
+	bool ifexe_flag2 = true;
+
+	//获取sql数据返回结果集
+	TAOS_RES* res;			//结果集字节流,这里写入无返回数据
+
+	string sq = "use ";
+	sq += dbname;
+	res = taos_query(m_ptaos, sq.c_str());
+	//检查结果集是否正常返回
+	if (res == NULL || taos_errno(res) != 0) {
+
+		return ACCESS_DB_FAILED;
+	}
+	taos_free_result(res);
+	res = NULL;
+
+
+	bool ifallTAG = false;
+	string tmpsql1;//中间部分是否加指定tag部分sql
+	//如果有TAG名组，就不是全部TAG，需添加TAG名和TAG值
+	if (0 != TAGsName)
+	{
+		tmpsql1 += " USING ";
+		tmpsql1 += stbname;
+		tmpsql1 += ' ';
+		tmpsql1 += '(';
+		for (int i = 0; i < TAGsNum; i++)
+		{
+			tmpsql1 += TAGsName[i];
+			if (i < TAGsNum - 1)
+				tmpsql1 += ", ";
+		}
+		tmpsql1 += ") ";
+
+		tmpsql1 += "TAGS (";
+	}
+	else//若是全部TAG，则直接添加TAG值即可
+	{
+		ifallTAG = true;
+
+		tmpsql1 += " USING ";
+		tmpsql1 += stbname;
+		tmpsql1 += ' ';
+		tmpsql1 += "TAGS (";
+	}
+
+	int nfields_num = fields_num;
+	int nrecord_num = record_num;
+	//读取成功，开始使用表的域信息
+	//记录一条记录长度和域偏移量
+	int nOneRecordLen = 0;
+	int fieldIdx = 0;
+	int recordIdx = 0;
+	//域的偏移量数组，个数大于域数即可
+	vector<int>	shOffset;//保存每个域的偏移量
+	vector<string> ntmpstr;//保存每个数据字符串
+	for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+	{
+		if (fieldIdx == 0)
+			shOffset.push_back(0);
+		else
+			shOffset.push_back(table_fields_info[fieldIdx - 1].field_len + shOffset[fieldIdx - 1]);
+
+		nOneRecordLen += table_fields_info[fieldIdx].field_len;
+
+		//顺便定义一些临时字串接收域数据
+		string str;
+		ntmpstr.push_back(str);
+	}
+
+	//map<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用,
+	//multimap与map不同的是，他可以填入多个相同的关键字
+	multimap<short, string> FldNotoV;//记录历史域号对应的value值，便于表域值使用
+	string sqlstr;
+
+
+	//填入字符串数据
+	for (recordIdx = 0; recordIdx < record_num; recordIdx++)
+	{
+
+		sqlstr.clear();
+		FldNotoV.clear();
+		ifexe_flag1 = true;
+		ifexe_flag2 = true;
+		for (fieldIdx = 0; fieldIdx < nfields_num; fieldIdx++)
+		{
+			int field_type = table_fields_info[fieldIdx].data_type;
+
+			//如果当前域是采样方式，提前判断是否需要采样，不需要则改flag
+			if (table_fields_info[fieldIdx].hdb_field_no == sample_modelandintervel[0])
+			{
+				switch (field_type)
+				{
+				case DB_DATA_TYPE_INT: {//5 32位整型
+					int tmp = 0;
+					memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+					if (tmp == 1)//不采样对应值为1，也就不建子表
+					{
+						ifexe_flag1 = false;
+					}
+						
+				}
+									 break;
+				default:
+					break;
+				}
+			}
+
+			//如果当前域是采样方式，提前判断是否需要采样，不需要则改flag
+			if (table_fields_info[fieldIdx].hdb_field_no == sample_modelandintervel[1])
+			{
+				switch (field_type)
+				{
+				case DB_DATA_TYPE_CHAR: {//3 字符
+					char chr = NULL;
+					memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+					short stmp = (short)chr;
+					if (stmp != 100)//周期为1s对应值为100，只有1s是才建子表，其他不建
+					{
+						ifexe_flag2 = false;
+					}
+
+				}
+									  break;
+				default:
+					break;
+				}
+			}
+
+			ntmpstr[fieldIdx] = "";
+			switch (field_type)
+			{
+			case DB_DATA_TYPE_NULL: {//0 未知类型，不解析
+				return DATA_TYPE_ERROR;
+			}
+								  break;
+			case DB_DATA_TYPE_STRING: {//2字符串	
+				char str[DB_CHN_DEVICE_NAME_LEN] = { 0 };
+				memcpy(str, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				////测试编码是否为GBK 打开文件以进行写操作，如果文件不存在则创建
+				//std::ofstream outputFile("example.txt");
+				//// 检查文件是否成功打开
+				//if (!outputFile.is_open()) {
+				//	std::cerr << "Error opening the file for writing." << std::endl;
+				//	return 1; // 返回错误代码
+				//}
+				//// 写入数据到文件
+				//outputFile << str;
+				//// 关闭文件
+				//outputFile.close();
+
+				/*===================编码是GBK，但转换后写入还是乱码！！！！！！！！！！！！！！！！==============================*/
+				//// C++原生库方法不行，创建一个用于转换的转换器对象
+				//wstring_convert<codecvt_byname<wchar_t, char, mbstate_t>> converter(new codecvt_byname<wchar_t, char, mbstate_t>("GBK"));
+				//// 将原始字符串转换为宽字符字符串
+				//wstring wide_string = converter.from_bytes(str);
+				//// 创建另一个用于转换的转换器对象
+				//wstring_convert<codecvt_utf8<wchar_t>, wchar_t> utf8_converter;
+				//// 将宽字符字符串转换为UTF-8
+				//string utf8_string = utf8_converter.to_bytes(wide_string);
+
+				//获取GBK和UTF-8的编解码器
+				QTextCodec* gbkCodec = QTextCodec::codecForName("GBK");
+				// 将GBK编码的字符串转换为Unicode字符串
+				QString unicodeStr = gbkCodec->toUnicode(str);
+				// 将Unicode字符串转换为UTF-8编码的字符串
+				QByteArray utf8Bytes;
+				utf8Bytes = unicodeStr.toUtf8();
+				char* utf8_str = utf8Bytes.data();
+
+
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += utf8_str;
+				ntmpstr[fieldIdx] += '\'';
+
+			}
+									break;
+			case DB_DATA_TYPE_CHAR: {//3 字符
+				char chr = NULL;
+				memcpy((char*)&chr, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				short stmp = (short)chr;
+
+				//ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += to_string(stmp);
+				//ntmpstr[fieldIdx] += '\'';
+			}
+								  break;
+			case DB_DATA_TYPE_SHORT: {//4 短整型
+				short tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			case DB_DATA_TYPE_INT: {//5 32位整型
+				int tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								 break;
+			case DB_DATA_TYPE_FLOAT: {//6 单精度浮点型
+				float tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			case DB_DATA_TYPE_DOUBLE: {//7 双精度浮点型
+				double tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+									break;
+			case DB_DATA_TYPE_DATETIME: {//9 时间型
+				on_time_t	curtime;				//occur_time临时接收
+				memcpy((char*)&curtime, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				const time_t cur = curtime;
+				struct tm tminfo;	//C++自带
+				localtime_s(&tminfo, &cur);//将的得到时间转成结构体tm类型
+				char strtime[80];
+				strftime(strtime, 80, "%Y-%m-%d %H:%M:%S", &tminfo);//把tm结构体已模型放入字符串中
+
+				ntmpstr[fieldIdx] += '\'';
+				ntmpstr[fieldIdx] += strtime;
+				ntmpstr[fieldIdx] += '\'';
+			}
+									  break;
+			case DB_DATA_TYPE_BINARY: {//11 二进制串，不解析
+				return DATA_TYPE_ERROR;
+			}
+									break;
+			case DB_DATA_TYPE_INT64: {//12 64位整型
+				int64_t tmp = 0;
+				memcpy((char*)&tmp, buf + recordIdx * nOneRecordLen + shOffset[fieldIdx], table_fields_info[fieldIdx].field_len);
+
+				ntmpstr[fieldIdx] = to_string(tmp);
+			}
+								   break;
+			default:
+				break;
+			}
+
+
+			//域号对应域值存入map
+			//FldNotoV[table_fields_info[fieldIdx].hdb_field_no] = ntmpstr[fieldIdx];//map做法
+			FldNotoV.insert(make_pair(table_fields_info[fieldIdx].hdb_field_no, ntmpstr[fieldIdx]));
+
+		}
+
+		//拼接整条sql
+		sqlstr = "INSERT INTO ";
+		sqlstr += stbname;//增加子表名唯一性
+		//sqlstr += to_string(string(stbname).length());//加个超表名字符个数，增加子表名唯一性
+		sqlstr += "_";
+
+		//sqlstr += FldNotoV[tbname_hfield_no];//指定域号值做子表名,map做法
+		multimap<short, string>::iterator it = FldNotoV.lower_bound(tbname_hfield_no);//接收关键字类型的第一个位置
+		sqlstr += it->second;
+
+		sqlstr += tmpsql1;
+
+		//添加tag的value通过历史域号来给
+		//FldNotoV.erase(tbname_hfield_no);//使用过的都给擦除，map做法
+		FldNotoV.erase(it);
+		for (int i = 0; i < TAGsNum; i++)
+		{
+			it = FldNotoV.lower_bound(TAGs_hfield_no[i]);
+			sqlstr += it->second;
+			//FldNotoV.erase(TAGs_hfield_no[i]);
+			FldNotoV.erase(it);
+			if (i < TAGsNum - 1)
+				sqlstr += ',';
+		}
+
+		sqlstr += ") ";
+		sqlstr += " VALUES (now, ";
+
+
+		//先标记一个map|multimap中倒数第一个数据的位置
+		multimap<short, string>::iterator itlast = FldNotoV.end();
+		--itlast;
+
+		// 使用迭代器遍历
+		for (multimap<short, string>::iterator it = FldNotoV.begin(); it != FldNotoV.end(); ++it)
+		{
+			sqlstr += it->second;
+			if (it != itlast)
+				sqlstr += ", ";
+
+		}
+		sqlstr += ") ";
+
+		if (ifexe_flag1 && ifexe_flag2)
+		{
+			res = taos_query(m_ptaos, sqlstr.c_str());
+			//检查结果集是否正常返回
+			int ret = 0;
+			ret = taos_errno(res);
+			if (res == NULL || ret != 0) {
+				taos_free_result(res);
+				return RES_EXE_FAILED;
+			}
+
+		}
+		
 #ifdef _WINDOWS
 		Sleep(1);
 #else
