@@ -1,23 +1,14 @@
 #pragma once
 #ifndef CTAOSSYN
 #define CTAOSSYN
-#include <vector>
+
 #include <map>
 #include <string>
 #include <QtCore>//Qt5的库暂只用到GBK到utf8内容转换
 #include <iostream>
 #include <fstream>//读文件所需
-#pragma execution_character_set("utf-8")//设置中文输入编码
-//#include "CCommonHead.h"
+#include "TaosCHead.h"
 using namespace std;
-
-#include "taos.h"//若不存在，改自己路径所在位置
-//包含网络子系统头文件
-#include "dnet_all.h"
-//包含历史库子系统头文件
-#include "hds_all.h"
-//包含实时库子系统头文件
-#include "rdb_all.h"
 
 #ifdef TAOSLIB_EXPORTS
 #define TAOSLIB_API __declspec(dllexport)
@@ -142,16 +133,6 @@ public://taos同步接口成员变量
 	int					m_port;					//taosd程序监听的端口，默认6030
 
 };
-
-#define SUCCESS_TAOS					0	//执行成功
-#define VARIABLE_NO_VALUE_TAOS			1	//数据库连接变量未赋值
-#define HANDLE_FAILED_TAOS				2	//句柄获取失败
-#define RES_EXE_FAILED					3	//执行失败
-#define BINARY_OR_NCHAR_LEN_OVERFLOW	4	//字段nchar或binary长度溢出
-#define CURRENCY_ERROR					5	//通用错误，如：内存释放数量错误
-#define OPEN_FIEL_FAILED				6	//文件打开失败
-#define ACCESS_DB_FAILED				7	//数据库访问失败
-#define DATA_TYPE_ERROR					8	//数据类型错误
 
 
 #endif // !CTAOSSYN

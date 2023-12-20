@@ -1,5 +1,6 @@
-#include "CCommonHead.h"
+#include "TaosCHead.h"
 #include "CTaosSyn.h"
+#include "CTaosASyn.h"
 
 
 //接入rr6000的64位版本，需要启动对应的系统
@@ -13,65 +14,79 @@ RDB_NET rdb_net;
 
 
 //测试已完成api
-void testmaster(CTaosSyn*& pTaosSyn_obj);
-void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj);
-void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj);
-void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
+void SYNmaster(CTaosSyn*& pTaosSyn_obj);
+void SYNExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj);
+void SYNExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj);
+void SYNExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
+void SYNExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj);
+void SYNInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj);
+void SYNInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj);
+void SYNInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj);
+void SYNInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj);
 
-void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj);
-void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj);
-void testInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj);
-void testInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj);
-void testInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj);
+//测试异步已完成
+void ASYNmaster(CTaosASyn*& pTaosASyn_obj);
+void ASYNExecuteOneQueryDirectofRecordList(CTaosASyn*& pTaosASyn_obj);
 
 int main(int argc, char* argv[])
 {
-	//初始化网络对象，连接rr6000去除该部分注释即可，初始化rr6000的64位版本，需要启动对应的系统
-	char str[60];
-	strcpy(str, "lzj");
-	dnet_obj.set_system_net_info(str, DNET_NO);
+	////初始化网络对象，连接rr6000去除该部分注释即可，初始化rr6000的64位版本，需要启动对应的系统
+	//char str[60];
+	//strcpy(str, "lzj");
+	//dnet_obj.set_system_net_info(str, DNET_NO);
+	//rdb_net.set_dnet_object(dnet_obj);
+	////初始化历史库访问对象
+	//if (hds_obj.InitAccess(&dnet_obj, HDS_API_TYPE_SERVICE) != RETNO_SUCCESS)
+	//{
+	//	return -1;
+	//}
 
-	rdb_net.set_dnet_object(dnet_obj);
-	//初始化历史库访问对象
-	if (hds_obj.InitAccess(&dnet_obj, HDS_API_TYPE_SERVICE) != RETNO_SUCCESS)
-	{
+
+	////封装同步接口部分
+	//int ret = -1;
+	//CTaosSyn* pTaosSyn_obj = new CTaosSyn();
+	//pTaosSyn_obj->m_host = "lzj-VM";
+	//pTaosSyn_obj->m_user = "root";
+	//pTaosSyn_obj->m_pass = "taosdata";
+	//pTaosSyn_obj->m_db = "";
+	//pTaosSyn_obj->m_port = 6030;
+	//ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj);
+	//if (0 != ret)
+	//	return -1;
+	////测试已完成同步api
+	//SYNmaster(pTaosSyn_obj);
+
+	//封装异步接口部分
+	int aret = -1;
+	CTaosASyn* pTaosASyn_obj = new CTaosASyn();
+	pTaosASyn_obj->m_host = "lzj-VM";
+	pTaosASyn_obj->m_user = "root";
+	pTaosASyn_obj->m_pass = "taosdata";
+	pTaosASyn_obj->m_db = "";
+	pTaosASyn_obj->m_port = 6030;
+	aret = pTaosASyn_obj->InitAccess(pTaosASyn_obj);
+	if (0 != aret)
 		return -1;
-	}
-
-
-	//封装接口部分
-	int ret = -1;
-	CTaosSyn* pTaosSyn_obj = new CTaosSyn();
-	pTaosSyn_obj->m_host = "lzj-VM";
-	pTaosSyn_obj->m_user = "root";
-	pTaosSyn_obj->m_pass = "taosdata";
-	pTaosSyn_obj->m_db = "";
-	pTaosSyn_obj->m_port = 6030;
-
-	ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj);
-	if (0 != ret)
-		return -1;
-
-	//测试已完成api
-	testmaster(pTaosSyn_obj);
+	//测试已完成同步api
+	ASYNmaster(pTaosASyn_obj);
 	
 
 	return 0;
 }
 
-void testmaster(CTaosSyn*& pTaosSyn_obj)
+void SYNmaster(CTaosSyn*& pTaosSyn_obj)
 {
-	//testExecuteOneQueryDirectofRecordBytes(pTaosSyn_obj);
-	//testExecuteSqlCtlDB(pTaosSyn_obj);
-	//testExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
-	//testExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
-	//testInsertNRecordtoOneTablebyBuf(pTaosSyn_obj);
-	//testInsertNRecordtoNTablebyBuf1(pTaosSyn_obj);
-	//testInsertNRecordtoNTablebyBuf2(pTaosSyn_obj);
-	testInsertNRecordtoNTablebyBufofSample(pTaosSyn_obj);
+	SYNExecuteOneQueryDirectofRecordBytes(pTaosSyn_obj);
+	//SYNExecuteSqlCtlDB(pTaosSyn_obj);
+	//SYNExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
+	//SYNExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
+	//SYNInsertNRecordtoOneTablebyBuf(pTaosSyn_obj);
+	//SYNInsertNRecordtoNTablebyBuf1(pTaosSyn_obj);
+	//SYNInsertNRecordtoNTablebyBuf2(pTaosSyn_obj);
+	//SYNInsertNRecordtoNTablebyBufofSample(pTaosSyn_obj);
 }
 
-void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
+void SYNExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
 {
 	int Ret = -1;
 	char* szResult = NULL;
@@ -79,6 +94,7 @@ void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
 	int Onerecordlen;
 	TAOS_FIELD* fields_info;
 	int fields_num = 0;
+	
 	Ret = pTaosSyn_obj->ExecuteOneQueryDirectofRecordBytes("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", szResult, Record_num, Onerecordlen, fields_info, fields_num);
 
 	//解析测试存放字节流是否正确
@@ -103,7 +119,7 @@ void testExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj)
 	free(szResult);
 }
 
-void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj)
+void SYNExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj)
 {
 	TAOS_RES* res;
 	int Ret = -1;
@@ -125,7 +141,7 @@ void testExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj)
+void SYNExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj)
 {
 	int Ret = -1;
 	char** Result = NULL;
@@ -156,7 +172,7 @@ void testExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj)
 	pTaosSyn_obj->FreePtP(Result, Record_num);
 }
 
-void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj)
+void SYNExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj)
 {
 	//接口待完成
 	string ntbname = "rr6000.meas_meter2";
@@ -174,7 +190,7 @@ void testExecuteInsertNRecordbyFile(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj)
+void SYNInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
@@ -256,7 +272,7 @@ void testInsertNRecordtoOneTablebyBuf(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj)
+void SYNInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
@@ -336,7 +352,7 @@ void testInsertNRecordtoNTablebyBuf1(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-void testInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj)
+void SYNInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj)
 {
 	//从rr6000中取记录集
 	/*通过域英文名获取域数据，域数据的长度和位置偏移量都需计算得到*/
@@ -420,8 +436,7 @@ void testInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj)
 
 }
 
-
-void testInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj)
+void SYNInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj)
 {
 	int Ret = -1;
 
@@ -498,4 +513,44 @@ void testInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj)
 	//释放空间
 	FREE((char*&)table_fields_info);
 	free(data_buf);
+}
+
+void ASYNmaster(CTaosASyn*& pTaosASyn_obj)
+{
+	ASYNExecuteOneQueryDirectofRecordList(pTaosASyn_obj);
+}
+
+void ASYNExecuteOneQueryDirectofRecordList(CTaosASyn*& pTaosASyn_obj)
+{
+	int Ret = -1;
+	char** szResult = NULL;
+	int Record_num;
+	int Onerecordlen;
+	TAOS_FIELD* fields_info;
+	int fields_num = 0;
+
+	Ret = pTaosASyn_obj->ExecuteOneQueryDirectofRecordList("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", szResult, Record_num, Onerecordlen, fields_info, fields_num);
+
+	//解析测试存放字节流是否正确
+	int Offset = 0;
+	Sleep(7000);
+	char date[65] = { 0 };
+	Sleep(2000);
+	int64_t ts = 0;
+	double value = 0;
+	Sleep(1000);
+	char name[60] = { 0 };
+	int type = 0;
+	for (int i = 0; i < Record_num; i++)//记录数，单挑记录长度，域偏移量
+	{
+		Offset = 0;
+		memcpy(date, szResult[i] + Offset, fields_info[0].bytes);
+		Offset += fields_info[0].bytes;
+		memcpy((char*)&value, szResult[i] + Offset, fields_info[1].bytes);
+		Offset += fields_info[1].bytes;
+		memcpy(name, szResult[i] + Offset, fields_info[2].bytes);
+		Offset += fields_info[2].bytes;
+		memcpy((char*)&type, szResult[i] + Offset, fields_info[3].bytes);
+	}
+	//pTaosASyn_obj->FreePtP(szResult, Record_num);
 }

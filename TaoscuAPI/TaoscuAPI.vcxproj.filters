@@ -29,12 +29,18 @@
     <ClCompile Include="TaoscuAPI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CTaosASyn.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CCommonHead.h">
+    <ClInclude Include="TaosCHead.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CTaosSyn.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CTaosASyn.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
