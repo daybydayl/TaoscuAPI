@@ -1,22 +1,23 @@
 #include "CTaosASyn.h"
 
+int Onerecordlen = 0;				//单条记录长度(回调需要)
 struct AnalysisRowStruct {
-	char**&			szResult;
-	int&			Record_num;
-	int&			Onerecordlen;
-	TAOS_FIELD*&	fields_info;
+	char**&			szResult;		//成员变量结果buf
+	int&			Record_num;		
+	int&			Onerecordlen;	//单条记录内部使用传参
+	TAOS_FIELD*&	fields_info;	
 	int&			fields_num;
 	int&			callbackRet;	//回调函数的返回值
 	vector<char*>	ptr_vect;		//建临时存放每条记录数据的指针
-	// 构造函数，用于初始化引用成员
-	AnalysisRowStruct(char**& rSzResult, int& rRecordNum, int& rOnerecordlen,TAOS_FIELD*& rFieldsInfo, int& rFieldsNum, int& rCallbackRet, vector<char*> rptr_vect)
+	bool&			Finishedresult;	//改完成标志
+
+	// 构造函数，用于初始化引用成员(引用成员必须初始值)
+	AnalysisRowStruct(char**& rSzResult, int& rRecordNum, int& rOnerecordlen,TAOS_FIELD*& rFieldsInfo, int& rFieldsNum, int& rCallbackRet, vector<char*> rptr_vect, bool& rFinishedresult)
 		: szResult(rSzResult), Record_num(rRecordNum), Onerecordlen(rOnerecordlen),
-		fields_info(rFieldsInfo), fields_num(rFieldsNum), callbackRet(rCallbackRet), ptr_vect(rptr_vect){
+		fields_info(rFieldsInfo), fields_num(rFieldsNum), callbackRet(rCallbackRet), ptr_vect(rptr_vect), Finishedresult(rFinishedresult){
 		// 其他构造逻辑
 	}
-
 };
-
 
 CTaosASyn::CTaosASyn()
 {
@@ -26,6 +27,10 @@ CTaosASyn::CTaosASyn()
 	m_pass.clear();
 	m_db.clear();
 	m_port = 6030;
+
+	m_szResult = NULL;
+	m_Retresult = 0;
+	m_FinishedResult = false;
 }
 
 CTaosASyn::~CTaosASyn()
@@ -50,29 +55,55 @@ int CTaosASyn::InitAccess(const CTaosASyn* TaosSyn_obj)
 		return HANDLE_FAILED_TAOS;
 }
 
-int CTaosASyn::ExecuteOneQueryDirectofRecordList(const char* szSqlSen, char**& szResult, int& Record_num, int& Onerecordlen, TAOS_FIELD*& fields_info, int& fields_num, const int nExecDBNo)
+int CTaosASyn::WaitOneQueryDirectofRecordList(const char* szSqlSen, int& Record_num, TAOS_FIELD*& fields_info, int& fields_num, const int nExecDBNo)
 {
-	TAOS_RES* res;//结果集字节流
-	int Ret = 0;//这里异步其实没用，可以优化
+	TAOS_RES* res;				//结果集字节流
+	int Ret = 0;				//这里异步其实没用，可以优化
 
-	//返回变量的初始化
-	Onerecordlen = 0;
 	Record_num = 0;
 	fields_info = 0;
 	fields_num = 0;
 
-	vector<char*>	ptr_vect;//累加异步查询记录的vec
-	AnalysisRowStruct* pAlyRowStru = new AnalysisRowStruct(szResult, Record_num, Onerecordlen, fields_info, fields_num, Ret, ptr_vect);
+	vector<char*>	ptr_vect;	//累加异步查询记录的vec
+
+	//将数个必要参数封装为一个结构体
+	AnalysisRowStruct* pAlyRowStru = new AnalysisRowStruct(m_szResult, Record_num, Onerecordlen, fields_info, fields_num, m_Retresult, ptr_vect,m_FinishedResult);
 
 	//直接异步获取数据集
-	taos_query_a(m_ptaos, szSqlSen, GetBlock_CallBack, (void *)pAlyRowStru);//这种还有问题，明天再看下
+	taos_query_a(m_ptaos, szSqlSen, GetBlock_CallBack, (void *)pAlyRowStru);
 
-	//delete pAlyRowStru;
+
+	/*===========================还是要写下返回值的判断===============================*/
 	return Ret;
 }
+int CTaosASyn::GetRecordList(char**& nResult)
+{
+	while (!m_FinishedResult)
+	{
+#ifndef _WINDOWS
+		usleep(1000);
+#else
+		Sleep(1);
+#endif // !_WINDOWS
+	}
 
+	nResult = m_szResult;
+	return m_Retresult;
+}
+int CTaosASyn::FreePtP(char**& Result, int& Record_num)
+{
+	if (Record_num < 0)
+		return CURRENCY_ERROR;
+
+	for (int i = 0; i < Record_num; ++i) {
+		free(Result[i]);
+	}
+	free(Result);
+	return SUCCESS_TAOS;
+}
 void CTaosASyn::GetBlock_CallBack(void* param, TAOS_RES* res, int code)
 {
+
 	AnalysisRowStruct* pAlyRowStru = static_cast<AnalysisRowStruct*>(param);
 
 	if (code == 0 && res) {
@@ -99,14 +130,12 @@ void CTaosASyn::GetBlock_CallBack(void* param, TAOS_RES* res, int code)
 		exit(1);
 	}
 
-	
-
 }
-
 void CTaosASyn::AnalysisRow_CallBack(void* param, TAOS_RES* res, int numOfRows)
 {
 	AnalysisRowStruct* pAlyRowStru = static_cast<AnalysisRowStruct*>(param);
 	TAOS_ROW row;			//一行记录数据
+
 	if (numOfRows > 0)
 	{
 		for (int i = 0; i < numOfRows; i++)
@@ -239,31 +268,28 @@ void CTaosASyn::AnalysisRow_CallBack(void* param, TAOS_RES* res, int numOfRows)
 		}
 		pAlyRowStru->Record_num += numOfRows;//累加记录数
 
-		if (pAlyRowStru->Record_num%numOfRows!=0 || pAlyRowStru->Record_num==numOfRows)//若到最后块了就开辟总buf大小
-		{
-			if (pAlyRowStru->szResult != NULL)
-			{
-				free(pAlyRowStru->szResult);
-				//创建二维地址指针存放空间
-				pAlyRowStru->szResult = (char**)malloc(pAlyRowStru->Record_num * sizeof(char*));
-			}
-			else
-				pAlyRowStru->szResult = (char**)malloc(pAlyRowStru->Record_num * sizeof(char*));
-
-			for (int i = 0; i < pAlyRowStru->Record_num; i++)
-			{
-				pAlyRowStru->szResult[i] = pAlyRowStru->ptr_vect[i];//赋值给char*指针
-			}
-		}
-
 		taos_fetch_rows_a(res, AnalysisRow_CallBack, pAlyRowStru);//获取下一批记录
 
 	}
 	else
 	{
-		pAlyRowStru->callbackRet = RES_EXE_FAILED;
+		//全部查完了
+		if (pAlyRowStru->szResult != NULL)
+		{
+			free(pAlyRowStru->szResult);
+			//创建二维地址指针存放空间
+			pAlyRowStru->szResult = (char**)malloc(pAlyRowStru->Record_num * sizeof(char*));
+		}
+		else
+			pAlyRowStru->szResult = (char**)malloc(pAlyRowStru->Record_num * sizeof(char*));
+
+		for (int i = 0; i < pAlyRowStru->Record_num; i++)
+		{
+			pAlyRowStru->szResult[i] = pAlyRowStru->ptr_vect[i];//赋值给char*指针
+		}
+		pAlyRowStru->Finishedresult = true;
+
 		//taos_free_result(res);//这里异步不能释放，释放对fields_info的获取就错误了，原因不理解
 	}
-
 
 }

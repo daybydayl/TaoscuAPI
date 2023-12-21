@@ -12,9 +12,8 @@ HAccess hds_obj;
 RDB_NET rdb_net;
 
 
-
 //测试已完成api
-void SYNmaster(CTaosSyn*& pTaosSyn_obj);
+void SYNmaster();
 void SYNExecuteOneQueryDirectofRecordBytes(CTaosSyn*& pTaosSyn_obj);
 void SYNExecuteSqlCtlDB(CTaosSyn*& pTaosSyn_obj);
 void SYNExecuteOneQueryDirectofRecordList(CTaosSyn*& pTaosSyn_obj);
@@ -25,7 +24,7 @@ void SYNInsertNRecordtoNTablebyBuf2(CTaosSyn*& pTaosSyn_obj);
 void SYNInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj);
 
 //测试异步已完成
-void ASYNmaster(CTaosASyn*& pTaosASyn_obj);
+void ASYNmaster();
 void ASYNExecuteOneQueryDirectofRecordList(CTaosASyn*& pTaosASyn_obj);
 
 int main(int argc, char* argv[])
@@ -42,43 +41,34 @@ int main(int argc, char* argv[])
 	//}
 
 
-	////封装同步接口部分
-	//int ret = -1;
-	//CTaosSyn* pTaosSyn_obj = new CTaosSyn();
-	//pTaosSyn_obj->m_host = "lzj-VM";
-	//pTaosSyn_obj->m_user = "root";
-	//pTaosSyn_obj->m_pass = "taosdata";
-	//pTaosSyn_obj->m_db = "";
-	//pTaosSyn_obj->m_port = 6030;
-	//ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj);
-	//if (0 != ret)
-	//	return -1;
 	////测试已完成同步api
-	//SYNmaster(pTaosSyn_obj);
+	//SYNmaster();
 
-	//封装异步接口部分
-	int aret = -1;
-	CTaosASyn* pTaosASyn_obj = new CTaosASyn();
-	pTaosASyn_obj->m_host = "lzj-VM";
-	pTaosASyn_obj->m_user = "root";
-	pTaosASyn_obj->m_pass = "taosdata";
-	pTaosASyn_obj->m_db = "";
-	pTaosASyn_obj->m_port = 6030;
-	aret = pTaosASyn_obj->InitAccess(pTaosASyn_obj);
-	if (0 != aret)
-		return -1;
 	//测试已完成同步api
-	ASYNmaster(pTaosASyn_obj);
+	ASYNmaster();
 	
-
 	return 0;
 }
 
-void SYNmaster(CTaosSyn*& pTaosSyn_obj)
+void SYNmaster()
 {
-	SYNExecuteOneQueryDirectofRecordBytes(pTaosSyn_obj);
+
+	//封装同步接口部分
+	int ret = -1;
+	CTaosSyn* pTaosSyn_obj = new CTaosSyn();
+	pTaosSyn_obj->m_host = "lzj-VM";
+	pTaosSyn_obj->m_user = "root";
+	pTaosSyn_obj->m_pass = "taosdata";
+	pTaosSyn_obj->m_db = "";
+	pTaosSyn_obj->m_port = 6030;
+	ret = pTaosSyn_obj->InitAccess(pTaosSyn_obj);
+	if (0 != ret)
+		return;
+
+
+	//SYNExecuteOneQueryDirectofRecordBytes(pTaosSyn_obj);
 	//SYNExecuteSqlCtlDB(pTaosSyn_obj);
-	//SYNExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
+	SYNExecuteOneQueryDirectofRecordList(pTaosSyn_obj);
 	//SYNExecuteInsertNRecordbyFile(pTaosSyn_obj);看是否需要，待完成
 	//SYNInsertNRecordtoOneTablebyBuf(pTaosSyn_obj);
 	//SYNInsertNRecordtoNTablebyBuf1(pTaosSyn_obj);
@@ -515,33 +505,46 @@ void SYNInsertNRecordtoNTablebyBufofSample(CTaosSyn*& pTaosSyn_obj)
 	free(data_buf);
 }
 
-void ASYNmaster(CTaosASyn*& pTaosASyn_obj)
+void ASYNmaster()
 {
+	//封装异步接口部分
+	int ret = -1;
+	CTaosASyn* pTaosASyn_obj = new CTaosASyn();
+	pTaosASyn_obj->m_host = "lzj-VM";
+	pTaosASyn_obj->m_user = "root";
+	pTaosASyn_obj->m_pass = "taosdata";
+	pTaosASyn_obj->m_db = "";
+	pTaosASyn_obj->m_port = 6030;
+	ret = pTaosASyn_obj->InitAccess(pTaosASyn_obj);
+	if (0 != ret)
+		return;
+
 	ASYNExecuteOneQueryDirectofRecordList(pTaosASyn_obj);
 }
 
 void ASYNExecuteOneQueryDirectofRecordList(CTaosASyn*& pTaosASyn_obj)
 {
 	int Ret = -1;
-	char** szResult = NULL;
+	char** szResult = NULL;					//二维获取结果，szResult[i]为第i条记录起始位置，按域大小来偏移
 	int Record_num;
-	int Onerecordlen;
 	TAOS_FIELD* fields_info;
 	int fields_num = 0;
 
-	Ret = pTaosASyn_obj->ExecuteOneQueryDirectofRecordList("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", szResult, Record_num, Onerecordlen, fields_info, fields_num);
+	//异步查询结果，后台执行，最好提前查询
+	Ret = pTaosASyn_obj->WaitOneQueryDirectofRecordList("select TO_ISO8601(ts, '+00:00'),meas_value,meas_name,meas_type from rr6000.meas_meter1", Record_num, fields_info, fields_num);
 
-	//解析测试存放字节流是否正确
-	int Offset = 0;
-	Sleep(7000);
-	char date[65] = { 0 };
-	Sleep(2000);
+	//Sleep(5000);//可以这里睡眠一会测试看效果
+	//需要结果时获取，若查询完成直接返回，未完成等至完成返回
+	Ret = pTaosASyn_obj->GetRecordList(szResult);
+
+
+	int Offset = 0;							//域偏移量
+	char date[65] = { 0 };					//临时接收数据
 	int64_t ts = 0;
 	double value = 0;
-	Sleep(1000);
 	char name[60] = { 0 };
 	int type = 0;
-	for (int i = 0; i < Record_num; i++)//记录数，单挑记录长度，域偏移量
+	for (int i = 0; i < Record_num; i++)	//记录数，单挑记录长度，域偏移量
 	{
 		Offset = 0;
 		memcpy(date, szResult[i] + Offset, fields_info[0].bytes);
@@ -552,5 +555,7 @@ void ASYNExecuteOneQueryDirectofRecordList(CTaosASyn*& pTaosASyn_obj)
 		Offset += fields_info[2].bytes;
 		memcpy((char*)&type, szResult[i] + Offset, fields_info[3].bytes);
 	}
-	//pTaosASyn_obj->FreePtP(szResult, Record_num);
+
+	//这里二维需要用接口释放
+	pTaosASyn_obj->FreePtP(szResult, Record_num);
 }

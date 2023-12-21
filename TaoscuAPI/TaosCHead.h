@@ -4,7 +4,6 @@
 #pragma execution_character_set("utf-8")//设置中文编码
 
 #include "taos.h"
-//#include <QtCore>
 
 //包含网络子系统头文件
 #include "dnet_all.h"
@@ -14,7 +13,6 @@
 #include "rdb_all.h"
 
 #include <vector>
-
 
 
 #define SUCCESS_TAOS					0	//执行成功
